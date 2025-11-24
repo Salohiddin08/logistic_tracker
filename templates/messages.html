@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Xabarlar · TG Yuk statistika{% endblock %}
+
+{% block content %}
+<h2>Saqlangan xabarlar</h2>
+<p class="subtitle">Bu yerda tanlangan kanallardan olingan so‘nggi xabarlar ro‘yxati chiqadi.</p>
+
+{% now "Y-m-d" as today %}
+<form method="get" class="mt-2" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+  <div>
+    <label>Boshlanish sanasi</label>
+    <input type="date" name="date_from" value="{{ date_from }}">
+  </div>
+  <div>
+    <label>Tugash sanasi</label>
+    <input type="date" name="date_to" value="{{ date_to }}">
+  </div>
+  <div>
+    <button type="submit" class="btn btn-primary">Filtrlash</button>
+  </div>
+  <div>
+    <a class="btn" href="?date_from={{ today }}&date_to={{ today }}">Bugungi xabarlar</a>
+  </div>
+</form>
+
+<table class="mt-2">
+  <thead>
+  <tr>
+    <th>Channel</th>
+    <th>Message ID</th>
+    <th>Sender</th>
+    <th>Text</th>
+    <th>Date</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for m in messages %}
+  <tr>
+    <td>{{ m.channel.title }} ({{ m.channel.channel_id }})</td>
+    <td>{{ m.message_id }}</td>
+    <td>{{ m.sender_name|default:'-' }}</td>
+    <td style="max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ m.text }}">{{ m.text }}</td>
+    <td>{{ m.date }}</td>
+  </tr>
+  {% empty %}
+  <tr>
+    <td colspan="5">Hozircha xabarlar saqlanmagan. Avval kanallar ro‘yxatidan kanal tanlab xabarlarni yuklab oling.</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

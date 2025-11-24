@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Yo'nalish bo'yicha xabarlar · TG Yuk statistika{% endblock %}
+
+{% block content %}
+<h2>Yo'nalish bo'yicha xabarlar</h2>
+<p class="subtitle">
+  Kanal ID: <span class="pill">{{ channel_id }}</span>
+  {% if origin %} · A nuqta: <strong>{{ origin }}</strong>{% endif %}
+  {% if destination %} · B nuqta: <strong>{{ destination }}</strong>{% endif %}
+</p>
+
+{% now "Y-m-d" as today %}
+<form method="get" class="mt-2" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+  <input type="hidden" name="origin" value="{{ origin }}">
+  <input type="hidden" name="destination" value="{{ destination }}">
+  <div>
+    <label>Boshlanish sanasi</label>
+    <input type="date" name="date_from" value="{{ date_from }}">
+  </div>
+  <div>
+    <label>Tugash sanasi</label>
+    <input type="date" name="date_to" value="{{ date_to }}">
+  </div>
+  <div>
+    <button type="submit" class="btn btn-primary">Filtrlash</button>
+  </div>
+  <div>
+    <a class="btn" href="?origin={{ origin }}&destination={{ destination }}&date_from={{ today }}&date_to={{ today }}">Bugungi yuklar</a>
+  </div>
+</form>
+
+<table class="mt-2">
+  <thead>
+  <tr>
+    <th>Message ID</th>
+    <th>Sana</th>
+    <th>Yo'nalish</th>
+    <th>Telefon</th>
+    <th>To'liq matn</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for sh in shipments %}
+  <tr>
+    <td>{{ sh.message.message_id }}</td>
+    <td>{{ sh.message.date }}</td>
+    <td>{{ sh.origin|default:'-' }} → {{ sh.destination|default:'-' }}</td>
+    <td>{{ sh.phone|default:'-' }}</td>
+    <td style="max-width:480px; white-space:pre-wrap;">{{ sh.message.text }}</td>
+  </tr>
+  {% empty %}
+  <tr>
+    <td colspan="5">Bu filtlar bo'yicha yuklar topilmadi.</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="mt-3">
+  <a class="link-btn" href="{% url 'channel_stats' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">⬅ Statistkaga qaytish</a>
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Statistika · TG Yuk statistika{% endblock %}
+
+{% block content %}
+<h2>Kanal statistika</h2>
+<p class="subtitle">Kanal ID: <span class="pill">{{ channel_id }}</span> · Jami yuk eʼlonlari: <strong>{{ total_shipments }}</strong></p>
+
+{% now "Y-m-d" as today %}
+<form method="get" class="mt-2" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+  <div>
+    <label>Boshlanish sanasi</label>
+    <input type="date" name="date_from" value="{{ date_from }}">
+  </div>
+  <div>
+    <label>Tugash sanasi</label>
+    <input type="date" name="date_to" value="{{ date_to }}">
+  </div>
+  <div>
+    <button type="submit" class="btn btn-primary">Filtrlash</button>
+  </div>
+  <div>
+    <a class="btn" href="?date_from={{ today }}&date_to={{ today }}">Bugungi yuklar</a>
+  </div>
+  <div>
+    <a class="btn" href="{% url 'channel_stats_excel' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">Excel (CSV) yuklab olish</a>
+  </div>
+</form>
+
+<div class="grid-2 mt-2">
+  <section>
+    <h3>A → B yo'nalishlari</h3>
+    <table class="mt-1">
+      <thead>
+      <tr>
+        <th>Qayerdan</th>
+        <th>Qayerga</th>
+        <th>Soni</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for r in route_stats %}
+      <tr>
+        <td>{{ r.origin|default:'-' }}</td>
+        <td>{{ r.destination|default:'-' }}</td>
+        <td>
+          <a href="{% url 'channel_route_messages' channel_id %}?origin={{ r.origin }}&destination={{ r.destination }}&date_from={{ date_from }}&date_to={{ date_to }}">
+            {{ r.total }}
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3">Yo‘nalishlar topilmadi.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h3>Yuk turlari</h3>
+    <table class="mt-1">
+      <thead>
+      <tr>
+        <th>Yuk</th>
+        <th>Soni</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for c in cargo_stats %}
+      <tr>
+        <td>{{ c.cargo_type|default:'-' }}</td>
+        <td>
+          <a href="{% url 'channel_cargo_messages' channel_id %}?cargo_type={{ c.cargo_type }}&date_from={{ date_from }}&date_to={{ date_to }}">
+            {{ c.total }}
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="2">Yuk turlari topilmadi.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h3 class="mt-3">Transport (ТЕНТ va boshqalar)</h3>
+    <table class="mt-1">
+      <thead>
+      <tr>
+        <th>Transport</th>
+        <th>Soni</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for t in truck_stats %}
+      <tr>
+        <td>{{ t.truck_type|default:'-' }}</td>
+        <td>{{ t.total }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="2">Transport turlari topilmadi.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<h3 class="mt-3">To'lov turi</h3>
+<table class="mt-1">
+  <thead>
+  <tr>
+    <th>To'lov</th>
+    <th>Soni</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for p in payment_stats %}
+  <tr>
+    <td>{{ p.payment_type|default:'-' }}</td>
+    <td>{{ p.total }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="2">To'lov maʼlumotlari topilmadi.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="mt-3">
+  <a class="link-btn" href="/channels/">⬅ Kanallarga qaytish</a>
+  <a class="link-btn" href="/messages/">Xabarlar ro‘yxatini ko‘rish</a>
+</div>
+{% endblock %}

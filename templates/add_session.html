@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Session qo‘shish · TG Yuk statistika{% endblock %}
+
+{% block content %}
+<h2>Telegram Session qo‘shish</h2>
+<p class="subtitle">API ID, API HASH va String Session ni kiriting. Bu maʼlumotlar faqat serverda saqlanadi.</p>
+
+<form method="post" class="mt-2">
+  {% csrf_token %}
+
+  <div class="mt-2">
+    <label for="api_id">API ID</label>
+    <input id="api_id" type="text" name="api_id" value="{{ default_api_id }}" required>
+  </div>
+
+  <div class="mt-2">
+    <label for="api_hash">API HASH</label>
+    <input id="api_hash" type="text" name="api_hash" value="{{ default_api_hash }}" required>
+  </div>
+
+  <div class="mt-2">
+    <label for="string_session">String Session</label>
+    <textarea id="string_session" name="string_session" rows="3" required></textarea>
+  </div>
+
+  <div class="mt-3">
+    <button type="submit" class="btn btn-primary">Saqlash va kanallarni ko‘rish</button>
+  </div>
+</form>
+{% endblock %}

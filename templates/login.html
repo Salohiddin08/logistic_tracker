@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Kirish · TG Yuk statistika{% endblock %}
+
+{% block content %}
+<h2>Tizimga kirish</h2>
+<p class="subtitle">Login va parol orqali panelga kiring.</p>
+
+<form method="post" class="mt-2">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div style="color:#f97373; margin-bottom:8px; font-size:13px;">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+  <div class="mt-2">
+    <label for="id_username">Login</label>
+    <input type="text" name="username" id="id_username" required>
+  </div>
+  <div class="mt-2">
+    <label for="id_password">Parol</label>
+    <input type="password" name="password" id="id_password" required>
+  </div>
+  <div class="mt-3">
+    <button type="submit" class="btn btn-primary">Kirish</button>
+  </div>
+</form>
+{% endblock %}
