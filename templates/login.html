@@ -3,8 +3,8 @@
 {% block title %}Kirish · TG Yuk statistika{% endblock %}
 
 {% block content %}
-<h2>Tizimga kirish</h2>
-<p class="subtitle">Login va parol orqali panelga kiring.</p>
+<h2 class="text-xl md:text-2xl font-semibold mb-3">Tizimga kirish</h2>
+<p class="subtitle text-sm md:text-base text-slate-600 mb-4">Login va parol orqali panelga kiring.</p>
 
 <form method="post" class="mt-2">
   {% csrf_token %}
@@ -15,14 +15,16 @@
   {% endif %}
   <div class="mt-2">
     <label for="id_username">Login</label>
-    <input type="text" name="username" id="id_username" required>
+    <input type="text" name="username" id="id_username" required
+           class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
   </div>
   <div class="mt-2">
     <label for="id_password">Parol</label>
-    <input type="password" name="password" id="id_password" required>
+    <input type="password" name="password" id="id_password" required
+           class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
   </div>
   <div class="mt-3">
-    <button type="submit" class="btn btn-primary">Kirish</button>
+    <button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1">Kirish</button>
   </div>
 </form>
 {% endblock %}

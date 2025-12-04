@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Telefon bo'yicha xabarlar · TG Yuk statistika{% endblock %}
+
+{% block content %}
+<h2 class="text-xl md:text-2xl font-semibold mb-3">Telefon bo'yicha xabarlar</h2>
+<p class="subtitle text-sm md:text-base text-slate-600 mb-4">
+  Kanal ID: <span class="pill inline-flex items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-500">{{ channel_id }}</span>
+  {% if phone %} · Telefon: <strong>{{ phone }}</strong>{% endif %}
+</p>
+
+{% now "Y-m-d" as today %}
+<form method="get" class="mt-2 flex flex-wrap gap-3 items-end">
+  <input type="hidden" name="phone" value="{{ phone }}">
+  <div class="flex flex-col">
+    <label class="text-xs md:text-sm text-slate-600 mb-1">Boshlanish sanasi</label>
+    <input type="date" name="date_from" value="{{ date_from }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
+  </div>
+  <div class="flex flex-col">
+    <label class="text-xs md:text-sm text-slate-600 mb-1">Tugash sanasi</label>
+    <input type="date" name="date_to" value="{{ date_to }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
+  </div>
+  <div class="flex flex-wrap gap-2 mt-3 md:mt-0">
+    <button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1">Filtrlash</button>
+    <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="?phone={{ phone }}&date_from={{ today }}&date_to={{ today }}">Bugungi xabarlar</a>
+  </div>
+</form>
+
+<div class="mt-4 relative overflow-x-auto bg-white shadow-sm rounded-lg border border-slate-200">
+  <table class="w-full text-sm text-left text-slate-700">
+    <thead class="text-sm text-slate-700 bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="px-4 py-3 font-medium">Message ID</th>
+        <th class="px-4 py-3 font-medium">Sana</th>
+        <th class="px-4 py-3 font-medium">Yo'nalish</th>
+        <th class="px-4 py-3 font-medium">To'lov</th>
+        <th class="px-4 py-3 font-medium">Telefon</th>
+        <th class="px-4 py-3 font-medium">To'liq matn</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for sh in shipments %}
+      <tr class="bg-white border-b border-slate-100 hover:bg-slate-50">
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ sh.message.message_id }}</td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ sh.message.date }}</td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ sh.origin|default:'-' }} → {{ sh.destination|default:'-' }}</td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ sh.payment_type|default:'-' }}</td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ sh.phone|default:'-' }}</td>
+        <td class="px-4 py-2.5 max-w-[520px]">
+          <div class="whitespace-pre-wrap">{{ sh.message.text }}</div>
+        </td>
+      </tr>
+    {% empty %}
+      <tr class="bg-white">
+        <td colspan="6" class="px-4 py-3 text-slate-500">Bu telefon raqami bo'yicha xabarlar topilmadi.</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-4 flex flex-wrap gap-3">
+  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="{% url 'channel_phones' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">⬅ Telefonlar ro'yxatiga qaytish</a>
+  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="{% url 'channel_stats' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">Kanal statistikasi</a>
+</div>
+{% endblock %}

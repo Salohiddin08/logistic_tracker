@@ -3,9 +3,9 @@
 {% block title %}Yo'nalish bo'yicha xabarlar · TG Yuk statistika{% endblock %}
 
 {% block content %}
-<h2>Yo'nalish bo'yicha xabarlar</h2>
-<p class="subtitle">
-  Kanal ID: <span class="pill">{{ channel_id }}</span>
+<h2 class="text-xl md:text-2xl font-semibold mb-3">Yo'nalish bo'yicha xabarlar</h2>
+<p class="subtitle text-sm md:text-base text-slate-600 mb-4">
+  Kanal ID: <span class="pill inline-flex items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-500">{{ channel_id }}</span>
   {% if origin %} · A nuqta: <strong>{{ origin }}</strong>{% endif %}
   {% if destination %} · B nuqta: <strong>{{ destination }}</strong>{% endif %}
 </p>
@@ -16,21 +16,23 @@
   <input type="hidden" name="destination" value="{{ destination }}">
   <div>
     <label>Boshlanish sanasi</label>
-    <input type="date" name="date_from" value="{{ date_from }}">
+    <input type="date" name="date_from" value="{{ date_from }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
   </div>
   <div>
     <label>Tugash sanasi</label>
-    <input type="date" name="date_to" value="{{ date_to }}">
+    <input type="date" name="date_to" value="{{ date_to }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
   </div>
   <div>
-    <button type="submit" class="btn btn-primary">Filtrlash</button>
+    <button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1">Filtrlash</button>
   </div>
   <div>
-    <a class="btn" href="?origin={{ origin }}&destination={{ destination }}&date_from={{ today }}&date_to={{ today }}">Bugungi yuklar</a>
+    <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="?origin={{ origin }}&destination={{ destination }}&date_from={{ today }}&date_to={{ today }}">Bugungi yuklar</a>
   </div>
 </form>
 
-<table class="mt-2">
+<table class="mt-3 w-full text-sm md:text-base">
   <thead>
   <tr>
     <th>Message ID</th>
@@ -57,7 +59,7 @@
   </tbody>
 </table>
 
-<div class="mt-3">
-  <a class="link-btn" href="{% url 'channel_stats' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">⬅ Statistkaga qaytish</a>
+<div class="mt-4">
+  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="{% url 'channel_stats' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">⬅ Statistkaga qaytish</a>
 </div>
 {% endblock %}

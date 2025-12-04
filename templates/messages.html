@@ -3,51 +3,57 @@
 {% block title %}Xabarlar · TG Yuk statistika{% endblock %}
 
 {% block content %}
-<h2>Saqlangan xabarlar</h2>
-<p class="subtitle">Bu yerda tanlangan kanallardan olingan so‘nggi xabarlar ro‘yxati chiqadi.</p>
+<h2 class="text-xl md:text-2xl font-semibold mb-3">Saqlangan xabarlar</h2>
+<p class="subtitle text-sm md:text-base text-slate-600 mb-4">Bu yerda tanlangan kanallardan olingan so‘nggi xabarlar ro‘yxati chiqadi.</p>
 
 {% now "Y-m-d" as today %}
 <form method="get" class="mt-2" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
   <div>
     <label>Boshlanish sanasi</label>
-    <input type="date" name="date_from" value="{{ date_from }}">
+    <input type="date" name="date_from" value="{{ date_from }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
   </div>
   <div>
     <label>Tugash sanasi</label>
-    <input type="date" name="date_to" value="{{ date_to }}">
+    <input type="date" name="date_to" value="{{ date_to }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
   </div>
   <div>
-    <button type="submit" class="btn btn-primary">Filtrlash</button>
+    <button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1">Filtrlash</button>
   </div>
   <div>
-    <a class="btn" href="?date_from={{ today }}&date_to={{ today }}">Bugungi xabarlar</a>
+    <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="?date_from={{ today }}&date_to={{ today }}">Bugungi xabarlar</a>
   </div>
 </form>
 
-<table class="mt-2">
-  <thead>
-  <tr>
-    <th>Channel</th>
-    <th>Message ID</th>
-    <th>Sender</th>
-    <th>Text</th>
-    <th>Date</th>
-  </tr>
-  </thead>
-  <tbody>
-  {% for m in messages %}
-  <tr>
-    <td>{{ m.channel.title }} ({{ m.channel.channel_id }})</td>
-    <td>{{ m.message_id }}</td>
-    <td>{{ m.sender_name|default:'-' }}</td>
-    <td style="max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ m.text }}">{{ m.text }}</td>
-    <td>{{ m.date }}</td>
-  </tr>
-  {% empty %}
-  <tr>
-    <td colspan="5">Hozircha xabarlar saqlanmagan. Avval kanallar ro‘yxatidan kanal tanlab xabarlarni yuklab oling.</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+<div class="mt-4 relative overflow-x-auto bg-white shadow-sm rounded-lg border border-slate-200">
+  <table class="w-full text-sm text-left text-slate-700">
+    <thead class="text-sm text-slate-700 bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="px-4 py-3 font-medium">Channel</th>
+        <th class="px-4 py-3 font-medium">Message ID</th>
+        <th class="px-4 py-3 font-medium">Sender</th>
+        <th class="px-4 py-3 font-medium">Matn</th>
+        <th class="px-4 py-3 font-medium">Sana</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in messages %}
+      <tr class="bg-white border-b border-slate-100 hover:bg-slate-50">
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ m.channel.title }} ({{ m.channel.channel_id }})</td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ m.message_id }}</td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ m.sender_name|default:'-' }}</td>
+        <td class="px-4 py-2.5 max-w-[420px]">
+          <div class="truncate" title="{{ m.text }}">{{ m.text }}</div>
+        </td>
+        <td class="px-4 py-2.5 whitespace-nowrap">{{ m.date }}</td>
+      </tr>
+    {% empty %}
+      <tr class="bg-white">
+        <td colspan="5" class="px-4 py-3 text-slate-500">Hozircha xabarlar saqlanmagan. Avval kanallar ro‘yxatidan kanal tanlab xabarlarni yuklab oling.</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

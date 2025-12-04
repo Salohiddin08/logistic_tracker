@@ -1,5 +1,4 @@
 import asyncio
-import csv
 
 from django.conf import settings
 from django.contrib.auth import logout
@@ -8,6 +7,9 @@ from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.dateparse import parse_date
+
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 
 from .models import TelegramSession, Channel, Message, Shipment
 from .telethon_client import get_client, get_channels, get_messages
@@ -189,31 +191,36 @@ def channel_stats_view(request, channel_id):
 
 @login_required
 def channel_stats_excel(request, channel_id):
-    """Tanlangan kanal bo'yicha yuk ma'lumotlarini (sana filtri bilan) CSV/Excel formatida yuklab berish."""
+    """Tanlangan kanal bo'yicha yuk ma'lumotlarini (sana filtri bilan) Excel (.xlsx) formatida yuklab berish."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
-
-    response = HttpResponse(content_type='text/csv')
 
     filename_parts = [f"channel_{channel_id}"]
     if date_from:
         filename_parts.append(f"from_{date_from}")
     if date_to:
         filename_parts.append(f"to_{date_to}")
-    filename = "_".join(filename_parts) + ".csv"
+    filename_base = "_".join(filename_parts)
 
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename_base}.xlsx"'
 
-    writer = csv.writer(response)
-    writer.writerow([
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Shipments"
+
+    headers = [
         'channel_id', 'channel_title', 'message_id', 'date',
         'origin', 'destination', 'cargo_type', 'truck_type',
         'payment_type', 'phone',
-    ])
+    ]
+    ws.append(headers)
 
     for shipment in shipments.select_related('message__channel'):
         msg = shipment.message
         ch = msg.channel
-        writer.writerow([
+        ws.append([
             ch.channel_id,
             ch.title or "",
             msg.message_id,
@@ -225,8 +232,127 @@ def channel_stats_excel(request, channel_id):
             shipment.payment_type or "",
             shipment.phone or "",
         ])
+
+    # Avtomatik ustun kengliklari
+    for idx in range(1, len(headers) + 1):
+        col_letter = get_column_letter(idx)
+        ws.column_dimensions[col_letter].width = 18
+
+    wb.save(response)
     return response
 
+
+@login_required
+def channel_phones_view(request, channel_id):
+    """Kanal bo'yicha unikal telefon raqamlar ro'yxati (sana bo'yicha filtrlash bilan).
+
+    Telefonlarga o'xshash raqamlar (uzunroq, + bilan boshlanadigan) va qisqa ID/raqamlarni
+    alohida ro'yxatlarga ajratamiz.
+    """
+    shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
+
+    raw_stats = (
+        shipments
+        .exclude(phone__isnull=True)
+        .exclude(phone__exact="")
+        .values('phone')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+
+    phone_stats = []  # haqiqiy telefonlar
+    id_stats = []     # ID / boshqa qisqa raqamlar
+
+    for item in raw_stats:
+        phone = item['phone'] or ""
+        digits_only = ''.join(ch for ch in phone if ch.isdigit())
+        # Oddiy heuristika: + bilan boshlangan yoki uzunroq raqamlar – telefon sifatida
+        if phone.startswith('+') or len(digits_only) >= 9:
+            phone_stats.append(item)
+        else:
+            id_stats.append(item)
+
+    context = {
+        'channel_id': channel_id,
+        'phone_stats': phone_stats,
+        'id_stats': id_stats,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    return render(request, 'phones.html', context)
+
+
+@login_required
+def channel_phones_excel(request, channel_id):
+    """Unikal telefon raqamlarini Excel (.xlsx) formatida yuklash."""
+    shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
+
+    phone_stats = (
+        shipments
+        .exclude(phone__isnull=True)
+        .exclude(phone__exact="")
+        .values('phone')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+
+    filename_parts = [f"channel_{channel_id}_phones"]
+    if date_from:
+        filename_parts.append(f"from_{date_from}")
+    if date_to:
+        filename_parts.append(f"to_{date_to}")
+    filename_base = "_".join(filename_parts)
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename_base}.xlsx"'
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Phones"
+
+    headers = ['phone', 'total_shipments']
+    ws.append(headers)
+
+    for item in phone_stats:
+        ws.append([
+            item['phone'],
+            item['total'],
+        ])
+
+    for idx in range(1, len(headers) + 1):
+        col_letter = get_column_letter(idx)
+        ws.column_dimensions[col_letter].width = 20
+
+    wb.save(response)
+    return response
+
+
+@login_required
+def channel_phone_messages_view(request, channel_id):
+    """Muayyan telefon raqami bo'yicha xabarlar ro'yxati."""
+    shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
+
+    phone = request.GET.get('phone') or None
+    if phone:
+        shipments = shipments.filter(phone=phone)
+
+    shipments = shipments.select_related('message__channel').order_by('-message__date')
+
+    context = {
+        'channel_id': channel_id,
+        'phone': phone,
+        'origin': None,
+        'destination': None,
+        'cargo_type': None,
+        'truck_type': None,
+        'payment_type': None,
+        'date_from': date_from,
+        'date_to': date_to,
+        'shipments': shipments,
+    }
+    return render(request, 'phone_messages.html', context)
 
 
 @login_required
@@ -278,6 +404,55 @@ def channel_cargo_messages_view(request, channel_id):
     }
     return render(request, 'route_messages.html', context)
 
+
+@login_required
+def channel_truck_messages_view(request, channel_id):
+    """Muayyan transport (truck_type) bo'yicha xabarlar ro'yxati."""
+    shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
+
+    truck_type = request.GET.get('truck_type') or None
+    if truck_type:
+        shipments = shipments.filter(truck_type=truck_type)
+
+    shipments = shipments.select_related('message__channel').order_by('-message__date')
+
+    context = {
+        'channel_id': channel_id,
+        'origin': None,
+        'destination': None,
+        'cargo_type': None,
+        'truck_type': truck_type,
+        'payment_type': None,
+        'date_from': date_from,
+        'date_to': date_to,
+        'shipments': shipments,
+    }
+    return render(request, 'route_messages.html', context)
+
+
+@login_required
+def channel_payment_messages_view(request, channel_id):
+    """Muayyan to'lov turi (payment_type) bo'yicha xabarlar ro'yxati."""
+    shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
+
+    payment_type = request.GET.get('payment_type') or None
+    if payment_type:
+        shipments = shipments.filter(payment_type=payment_type)
+
+    shipments = shipments.select_related('message__channel').order_by('-message__date')
+
+    context = {
+        'channel_id': channel_id,
+        'origin': None,
+        'destination': None,
+        'cargo_type': None,
+        'truck_type': None,
+        'payment_type': payment_type,
+        'date_from': date_from,
+        'date_to': date_to,
+        'shipments': shipments,
+    }
+    return render(request, 'route_messages.html', context)
 
 
 @login_required

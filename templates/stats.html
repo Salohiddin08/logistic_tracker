@@ -3,34 +3,45 @@
 {% block title %}Statistika · TG Yuk statistika{% endblock %}
 
 {% block content %}
-<h2>Kanal statistika</h2>
-<p class="subtitle">Kanal ID: <span class="pill">{{ channel_id }}</span> · Jami yuk eʼlonlari: <strong>{{ total_shipments }}</strong></p>
+<h2 class="text-xl md:text-2xl font-semibold mb-3">Kanal statistika</h2>
+<p class="subtitle text-sm md:text-base text-slate-600 mb-4">Kanal ID: <span class="pill inline-flex items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-500">{{ channel_id }}</span> · Jami yuk eʼlonlari: <strong>{{ total_shipments }}</strong></p>
 
 {% now "Y-m-d" as today %}
-<form method="get" class="mt-2" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
-  <div>
-    <label>Boshlanish sanasi</label>
-    <input type="date" name="date_from" value="{{ date_from }}">
+<form method="get" class="mt-3 flex flex-wrap items-end gap-3">
+  <div class="flex flex-col">
+    <label class="text-xs md:text-sm text-slate-600 mb-1">Boshlanish sanasi</label>
+    <input type="date" name="date_from" value="{{ date_from }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
   </div>
-  <div>
-    <label>Tugash sanasi</label>
-    <input type="date" name="date_to" value="{{ date_to }}">
+  <div class="flex flex-col">
+    <label class="text-xs md:text-sm text-slate-600 mb-1">Tugash sanasi</label>
+    <input type="date" name="date_to" value="{{ date_to }}"
+           class="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm md:text-base text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px] md:min-w-[260px]">
   </div>
-  <div>
-    <button type="submit" class="btn btn-primary">Filtrlash</button>
-  </div>
-  <div>
-    <a class="btn" href="?date_from={{ today }}&date_to={{ today }}">Bugungi yuklar</a>
-  </div>
-  <div>
-    <a class="btn" href="{% url 'channel_stats_excel' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}">Excel (CSV) yuklab olish</a>
+  <div class="flex flex-wrap gap-2 mt-3 md:mt-0">
+    <button type="submit"
+            class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1">
+      Filtrlash
+    </button>
+    <a href="?date_from={{ today }}&date_to={{ today }}"
+       class="inline-flex items-center rounded-md bg-emerald-500 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+      Bugungi yuklar
+    </a>
+    <a href="{% url 'channel_stats_excel' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}"
+       class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1">
+      Excel yuklab olish
+    </a>
+    <a href="{% url 'channel_phones' channel_id %}?date_from={{ date_from }}&date_to={{ date_to }}"
+       class="inline-flex items-center rounded-md bg-purple-500 px-4 py-2 text-sm md:text-base font-semibold text-white shadow-sm hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1">
+      Telefonlar (unikal)
+    </a>
   </div>
 </form>
 
-<div class="grid-2 mt-2">
+<div class="mt-4 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
   <section>
     <h3>A → B yo'nalishlari</h3>
-    <table class="mt-1">
+    <table class="mt-3 w-full text-sm md:text-base">
       <thead>
       <tr>
         <th>Qayerdan</th>
@@ -57,9 +68,9 @@
   </section>
 
   <section>
-    <h3>Yuk turlari</h3>
-    <table class="mt-1">
-      <thead>
+    <h3 class="text-sm md:text-base font-semibold text-slate-800 mb-2">Yuk turlari</h3>
+    <table class="mt-3 w-full text-sm md:text-base">
+      <thead class="bg-blue-50">
       <tr>
         <th>Yuk</th>
         <th>Soni</th>
@@ -82,7 +93,7 @@
     </table>
 
     <h3 class="mt-3">Transport (ТЕНТ va boshqalar)</h3>
-    <table class="mt-1">
+    <table class="mt-3 w-full text-sm md:text-base">
       <thead>
       <tr>
         <th>Transport</th>
@@ -93,7 +104,11 @@
       {% for t in truck_stats %}
       <tr>
         <td>{{ t.truck_type|default:'-' }}</td>
-        <td>{{ t.total }}</td>
+        <td>
+          <a href="{% url 'channel_truck_messages' channel_id %}?truck_type={{ t.truck_type }}&date_from={{ date_from }}&date_to={{ date_to }}">
+            {{ t.total }}
+          </a>
+        </td>
       </tr>
       {% empty %}
       <tr><td colspan="2">Transport turlari topilmadi.</td></tr>
@@ -103,9 +118,9 @@
   </section>
 </div>
 
-<h3 class="mt-3">To'lov turi</h3>
-<table class="mt-1">
-  <thead>
+<h3 class="mt-6 text-sm md:text-base font-semibold text-slate-800 mb-2">To'lov turi</h3>
+<table class="mt-3 w-full text-sm md:text-base">
+  <thead class="bg-emerald-50">
   <tr>
     <th>To'lov</th>
     <th>Soni</th>
@@ -115,7 +130,11 @@
   {% for p in payment_stats %}
   <tr>
     <td>{{ p.payment_type|default:'-' }}</td>
-    <td>{{ p.total }}</td>
+    <td>
+      <a href="{% url 'channel_payment_messages' channel_id %}?payment_type={{ p.payment_type }}&date_from={{ date_from }}&date_to={{ date_to }}">
+        {{ p.total }}
+      </a>
+    </td>
   </tr>
   {% empty %}
   <tr><td colspan="2">To'lov maʼlumotlari topilmadi.</td></tr>
@@ -123,8 +142,8 @@
   </tbody>
 </table>
 
-<div class="mt-3">
-  <a class="link-btn" href="/channels/">⬅ Kanallarga qaytish</a>
-  <a class="link-btn" href="/messages/">Xabarlar ro‘yxatini ko‘rish</a>
+<div class="mt-4 flex flex-wrap gap-3">
+  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="/channels/">⬅ Kanallarga qaytish</a>
+  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="/messages/">Xabarlar ro‘yxatini ko‘rish</a>
 </div>
 {% endblock %}

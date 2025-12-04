@@ -3,17 +3,17 @@
 {% block title %}Kanallar · TG Yuk statistika{% endblock %}
 
 {% block content %}
-<h2>Kanallar ro‘yxati</h2>
-<p class="subtitle">Qaysi kanal bo‘yicha yuk statistikasi va xabarlarni ko‘rmoqchisiz, o‘sha kanalni tanlang.</p>
+<h2 class="text-xl md:text-2xl font-semibold mb-3">Kanallar ro‘yxati</h2>
+<p class="subtitle text-sm md:text-base text-slate-600 mb-4">Qaysi kanal bo‘yicha yuk statistikasi va xabarlarni ko‘rmoqchisiz, o‘sha kanalni tanlang.</p>
 
-<ul class="tag-list mt-2">
+<ul class="tag-list mt-3 flex flex-wrap gap-3">
   {% for c in channels %}
     <li>
       <a href="/fetch/{{ c.id }}/" title="{{ c.title }}"
-         style="display:inline-flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:180px;">
-        <span><strong>{{ c.title|default:'Nomsiz kanal' }}</strong></span>
-        <span class="pill">ID: {{ c.id }}</span>
-        <span style="font-size:11px; color:var(--text-muted);">Bosilganda xabarlar saqlanib, statistika yangilanadi</span>
+         class="inline-flex flex-col items-start gap-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-blue-50 hover:border-blue-300">
+        <span class="font-semibold text-sm md:text-base">{{ c.title|default:'Nomsiz kanal' }}</span>
+        <span class="pill inline-flex items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-500">ID: {{ c.id }}</span>
+        <span class="text-[11px] text-slate-500">Bosilganda xabarlar saqlanib, statistika yangilanadi</span>
       </a>
     </li>
   {% empty %}
@@ -21,7 +21,7 @@
   {% endfor %}
 </ul>
 
-<div class="mt-3">
-  <a class="link-btn" href="/messages/">Saqlangan xabarlarni ko‘rish</a>
+<div class="mt-4">
+  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="/messages/">Saqlangan xabarlarni ko‘rish</a>
 </div>
 {% endblock %}
