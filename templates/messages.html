@@ -56,4 +56,20 @@
     </tbody>
   </table>
 </div>
+
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div class="mt-4 flex items-center justify-center gap-3 text-xs md:text-sm text-slate-700">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+         class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">⬅ Oldingi</a>
+    {% endif %}
+
+    <span class="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Sahifa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+         class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">Keyingi ➡</a>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}

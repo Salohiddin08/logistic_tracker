@@ -65,6 +65,36 @@
       {% endfor %}
       </tbody>
     </table>
+
+    {% if route_page_obj and route_page_obj.paginator.num_pages > 1 %}
+    <div class="mt-2 flex items-center justify-center gap-3 text-xs md:text-sm text-slate-700">
+      {% if route_page_obj.has_previous %}
+        <a href="?route_page={{ route_page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">⬅ Oldingi</a>
+      {% endif %}
+      <span class="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Sahifa {{ route_page_obj.number }} / {{ route_page_obj.paginator.num_pages }}</span>
+      {% if route_page_obj.has_next %}
+        <a href="?route_page={{ route_page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">Keyingi ➡</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if route_page_obj %}
+    <div class="mt-3 flex items-center gap-3 text-sm text-slate-700">
+      {% if route_page_obj.has_previous %}
+        <a href="?route_page={{ route_page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-md bg-slate-100 px-3 py-1 font-medium hover:bg-slate-200">⬅ Oldingi</a>
+      {% endif %}
+
+      <span>Sahifa {{ route_page_obj.number }} / {{ route_page_obj.paginator.num_pages }}</span>
+
+      {% if route_page_obj.has_next %}
+        <a href="?route_page={{ route_page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-md bg-slate-100 px-3 py-1 font-medium hover:bg-slate-200">Keyingi ➡</a>
+      {% endif %}
+    </div>
+    {% endif %}
   </section>
 
   <section>
@@ -92,6 +122,20 @@
       </tbody>
     </table>
 
+    {% if cargo_page_obj and cargo_page_obj.paginator.num_pages > 1 %}
+    <div class="mt-2 flex items-center justify-center gap-3 text-xs md:text-sm text-slate-700">
+      {% if cargo_page_obj.has_previous %}
+        <a href="?cargo_page={{ cargo_page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">⬅ Oldingi</a>
+      {% endif %}
+      <span class="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Sahifa {{ cargo_page_obj.number }} / {{ cargo_page_obj.paginator.num_pages }}</span>
+      {% if cargo_page_obj.has_next %}
+        <a href="?cargo_page={{ cargo_page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">Keyingi ➡</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <h3 class="mt-3">Transport (ТЕНТ va boshqalar)</h3>
     <table class="mt-3 w-full text-sm md:text-base">
       <thead>
@@ -115,6 +159,20 @@
       {% endfor %}
       </tbody>
     </table>
+
+    {% if truck_page_obj and truck_page_obj.paginator.num_pages > 1 %}
+    <div class="mt-2 flex items-center justify-center gap-3 text-xs md:text-sm text-slate-700">
+      {% if truck_page_obj.has_previous %}
+        <a href="?truck_page={{ truck_page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">⬅ Oldingi</a>
+      {% endif %}
+      <span class="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Sahifa {{ truck_page_obj.number }} / {{ truck_page_obj.paginator.num_pages }}</span>
+      {% if truck_page_obj.has_next %}
+        <a href="?truck_page={{ truck_page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">Keyingi ➡</a>
+      {% endif %}
+    </div>
+    {% endif %}
   </section>
 </div>
 
@@ -141,6 +199,20 @@
   {% endfor %}
   </tbody>
 </table>
+
+{% if payment_page_obj and payment_page_obj.paginator.num_pages > 1 %}
+<div class="mt-2 flex items-center justify-center gap-3 text-xs md:text-sm text-slate-700">
+  {% if payment_page_obj.has_previous %}
+    <a href="?payment_page={{ payment_page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+       class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">⬅ Oldingi</a>
+  {% endif %}
+  <span class="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Sahifa {{ payment_page_obj.number }} / {{ payment_page_obj.paginator.num_pages }}</span>
+  {% if payment_page_obj.has_next %}
+    <a href="?payment_page={{ payment_page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+       class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-100">Keyingi ➡</a>
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="mt-4 flex flex-wrap gap-3">
   <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="/channels/">⬅ Kanallarga qaytish</a>

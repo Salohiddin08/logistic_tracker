@@ -2,7 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.add_session, name='add_session'),
+    # Saytga birinchi kirilganda Telegram telefon-login sahifasi ochiladi
+    path('', views.telegram_phone_login, name='telegram_phone_login'),
+    path('add-session/', views.add_session, name='add_session'),
+    path('tg-login/phone/', views.telegram_phone_login, name='telegram_phone_login'),
+    path('tg-login/code/', views.telegram_phone_code, name='telegram_phone_code'),
     path('channels/', views.channels_view, name='channels'),
     path('fetch/<int:channel_id>/', views.fetch_messages_view, name='fetch_messages'),
     path('messages/', views.saved_messages_view, name='saved_messages'),
