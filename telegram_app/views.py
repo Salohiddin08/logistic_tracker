@@ -5,8 +5,11 @@ from django.contrib.auth import logout
 from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.core.paginator import Paginator
+from django.views.decorators.http import require_POST
+from asgiref.sync import async_to_sync
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -14,9 +17,77 @@ from openpyxl.utils import get_column_letter
 from .models import TelegramSession, Channel, Message, Shipment
 from .telethon_client import get_client, get_channels, get_messages
 from .utils import save_messages_json, parse_shipment_text
+from .bot_service import send_export_now
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
+
+
+def home_view(request):
+    """Home page: show dashboard if session exists, else redirect to Telegram login."""
+    if TelegramSession.objects.last():
+        return redirect('dashboard')
+    return redirect('telegram_phone_login')
+
+
+def dashboard_view(request):
+    """Simple dashboard for today."""
+    today = timezone.localdate()
+
+    shipments = Shipment.objects.select_related('message__channel').filter(message__date__date=today)
+
+    total_today = shipments.count()
+
+    top_origins = (
+        shipments.values('origin')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+    top_destinations = (
+        shipments.values('destination')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+    top_payments = (
+        shipments.values('payment_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+    top_cargo = (
+        shipments.values('cargo_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+
+    sent = request.GET.get('sent')
+    error = request.GET.get('err')
+
+    context = {
+        'today': today,
+        'total_today': total_today,
+        'top_origins': top_origins,
+        'top_destinations': top_destinations,
+        'top_payments': top_payments,
+        'top_cargo': top_cargo,
+        'sent': sent,
+        'error': error,
+    }
+    return render(request, 'dashboard.html', context)
+
+
+@require_POST
+def bot_export_view(request):
+    """Send Excel export to admin chat via Telegram bot."""
+    try:
+        days = int(request.POST.get('days') or 1)
+    except Exception:
+        days = 1
+
+    try:
+        async_to_sync(send_export_now)(days=days)
+        return redirect(f"/dashboard/?sent=1")
+    except Exception as exc:
+        return redirect(f"/dashboard/?err={str(exc)}")
 
 
 def add_session(request):
@@ -43,10 +114,25 @@ def add_session(request):
     return render(request, 'add_session.html', context)
 
 
-async def _start_phone_login(phone: str):
-    """Telefon raqamni qabul qilib, kod yuboradi va vaqtinchalik sessiyani qaytaradi."""
+def _get_tg_credentials():
     api_id = getattr(settings, 'TG_API_ID', None)
     api_hash = getattr(settings, 'TG_API_HASH', None)
+
+    if not api_id or not api_hash:
+        raise ValueError("TG_API_ID / TG_API_HASH .env faylda to'ldirilmagan")
+
+    # Telethon api_id int bo'lishini kutadi
+    try:
+        api_id = int(api_id)
+    except Exception as exc:
+        raise ValueError("TG_API_ID raqam (int) bo'lishi kerak") from exc
+
+    return api_id, api_hash
+
+
+async def _start_phone_login(phone: str):
+    """Telefon raqamni qabul qilib, kod yuboradi va vaqtinchalik sessiyani qaytaradi."""
+    api_id, api_hash = _get_tg_credentials()
     client = TelegramClient(StringSession(), api_id, api_hash)
     await client.connect()
     sent = await client.send_code_request(phone)
@@ -62,8 +148,7 @@ async def _complete_phone_login(temp_session: str, phone: str, code: str, passwo
       2) sign_in(phone, code, phone_code_hash=...)
       3) Agar 2FA yoqilgan bo'lsa: SessionPasswordNeededError -> sign_in(password=...)
     """
-    api_id = getattr(settings, 'TG_API_ID', None)
-    api_hash = getattr(settings, 'TG_API_HASH', None)
+    api_id, api_hash = _get_tg_credentials()
     client = TelegramClient(StringSession(temp_session), api_id, api_hash)
     await client.connect()
 
@@ -72,12 +157,13 @@ async def _complete_phone_login(temp_session: str, phone: str, code: str, passwo
     try:
         await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
     except SessionPasswordNeededError:
-        # Demak, endi alohida parol bilan sign_in qilishimiz kerak.
-        pass
-
-    # 2-bosqich: 2FA parolni yuborish (foydalanuvchi kiritgan bo'lsa).
-    if password:
+        # Two-step verification yoqilgan
+        if not password:
+            raise ValueError("Telegram akkauntingizda 2-bosqichli parol (Two‑step verification) yoqilgan. Parolni kiriting.")
         await client.sign_in(password=password)
+
+    # Agar 2FA talab qilinmagan bo'lsa, lekin password berilgan bo'lsa ham muammo emas.
+    # (Telethon ba'zida password sign_in ni qayta chaqirishni talab qilmaydi)
 
     return client.session.save()
 
@@ -87,16 +173,21 @@ def telegram_phone_login(request):
 
     Telefon kiritilgach, Telethon orqali kod yuboriladi va keyingi bosqichga yo'naltiriladi.
     """
+    error = None
+
     if request.method == 'POST':
         phone = request.POST.get('phone')
         if phone:
-            temp_session, phone_code_hash = asyncio.run(_start_phone_login(phone))
-            request.session['tg_phone'] = phone
-            request.session['tg_temp_session'] = temp_session
-            request.session['tg_phone_code_hash'] = phone_code_hash
-            return redirect('telegram_phone_code')
+            try:
+                temp_session, phone_code_hash = asyncio.run(_start_phone_login(phone))
+                request.session['tg_phone'] = phone
+                request.session['tg_temp_session'] = temp_session
+                request.session['tg_phone_code_hash'] = phone_code_hash
+                return redirect('telegram_phone_code')
+            except Exception as exc:
+                error = str(exc)
 
-    return render(request, 'telegram_login_phone.html')
+    return render(request, 'telegram_login_phone.html', {'error': error})
 
 
 def telegram_phone_code(request):
@@ -154,7 +245,20 @@ def channels_view(request):
         client = await get_client(session.api_id, session.api_hash, session.string_session)
         return await get_channels(client)
 
-    channels = asyncio.run(run())
+    try:
+        channels = asyncio.run(run())
+    except Exception as exc:
+        # Debug rejimda detail ko'rinadi; aks holda ham foydali xabar chiqadi
+        return render(
+            request,
+            'error.html',
+            {
+                'title': 'Telegram ulanish xatosi',
+                'message': "Kanallarni olishda xatolik. Session eskirgan bo'lishi yoki TG_API_ID/TG_API_HASH noto'g'ri bo'lishi mumkin.",
+                'detail': str(exc),
+            },
+            status=500,
+        )
 
     return render(request, 'channels.html', {'channels': channels})
 

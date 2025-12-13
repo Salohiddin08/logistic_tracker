@@ -24,7 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env_config('SECRET_KEY', default='django-insecure-&q9n(qt4x+1^c1mim^nfw^p05#w375p1cs^33$1rwt(i3-yb%6') # SECURITY WARNING: keep the secret key used in production secret!
-DEBUG = env_config('DEBUG', cast=bool, default=False)
+# Development default: show errors unless DEBUG explicitly set in .env
+DEBUG = env_config('DEBUG', cast=bool, default=True)
 
 ALLOWED_HOSTS = ['*']
 
@@ -123,9 +124,13 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-TG_API_ID = env_config('TG_API_ID')
-TG_API_HASH = env_config('TG_API_HASH')
-TG_SESSION = env_config('TG_SESSION')
+TG_API_ID = env_config('TG_API_ID', cast=int, default=None)
+TG_API_HASH = env_config('TG_API_HASH', default=None)
+TG_SESSION = env_config('TG_SESSION', default=None)
+
+# Telegram Bot (admin reports)
+TELEGRAM_BOT_TOKEN = env_config('TELEGRAM_BOT_TOKEN', default=None)
+TELEGRAM_ADMIN_CHAT_ID = env_config('TELEGRAM_ADMIN_CHAT_ID', cast=int, default=None)
 
 # Auth redirect settings
 LOGIN_URL = 'login'

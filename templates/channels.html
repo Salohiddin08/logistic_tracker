@@ -1,27 +1,36 @@
-{% extends 'base.html' %}
+{% extends 'app_base.html' %}
 
-{% block title %}Kanallar · TG Yuk statistika{% endblock %}
+{% block page_title %}Kanallar{% endblock page_title %}
 
-{% block content %}
-<h2 class="text-xl md:text-2xl font-semibold mb-3">Kanallar ro‘yxati</h2>
-<p class="subtitle text-sm md:text-base text-slate-600 mb-4">Qaysi kanal bo‘yicha yuk statistikasi va xabarlarni ko‘rmoqchisiz, o‘sha kanalni tanlang.</p>
-
-<ul class="tag-list mt-3 flex flex-wrap gap-3">
+{% block page_content %}
+<div class="row">
   {% for c in channels %}
-    <li>
-      <a href="/fetch/{{ c.id }}/" title="{{ c.title }}"
-         class="inline-flex flex-col items-start gap-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-blue-50 hover:border-blue-300">
-        <span class="font-semibold text-sm md:text-base">{{ c.title|default:'Nomsiz kanal' }}</span>
-        <span class="pill inline-flex items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-500">ID: {{ c.id }}</span>
-        <span class="text-[11px] text-slate-500">Bosilganda xabarlar saqlanib, statistika yangilanadi</span>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'fetch_messages' c.id %}" class="text-reset">
+        <div class="card card-primary card-outline">
+          <div class="card-body">
+            <h5 class="card-title d-block mb-1">{{ c.title|default:'Nomsiz kanal' }}</h5>
+            <p class="card-text mb-0">
+              <small class="text-muted">ID: {{ c.id }}</small>
+            </p>
+            <p class="card-text mt-2 mb-0">
+              <small class="text-muted">Bosilganda xabarlar saqlanadi va statistika yangilanadi.</small>
+            </p>
+          </div>
+        </div>
       </a>
-    </li>
+    </div>
   {% empty %}
-    <li>Kanallar topilmadi. Avval session qo‘shing.</li>
+    <div class="col-12">
+      <div class="alert alert-warning mb-0">Kanallar topilmadi. Avval session qo‘shing.</div>
+    </div>
   {% endfor %}
-</ul>
-
-<div class="mt-4">
-  <a class="inline-flex items-center rounded-md bg-slate-100 px-4 py-2 text-sm md:text-base font-medium text-slate-800 hover:bg-slate-200" href="/messages/">Saqlangan xabarlarni ko‘rish</a>
 </div>
-{% endblock %}
+
+<div class="mt-3">
+  <a class="btn btn-default" href="{% url 'saved_messages' %}">
+    <i class="far fa-comment-dots mr-1"></i>
+    Saqlangan xabarlar
+  </a>
+</div>
+{% endblock page_content %}
