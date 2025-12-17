@@ -1,4 +1,6 @@
-#!/home/salohiddin/logistic_tracker/venv/bin/python3
+#!/bin/sh
+'''exec' "/home/salohiddin/Desktop/LOGISTIC TRACKER/logistic_tracker/venv/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys

@@ -20,4 +20,5 @@ urlpatterns = [
     path('stats/<int:channel_id>/truck/', views.channel_truck_messages_view, name='channel_truck_messages'),
     path('stats/<int:channel_id>/payment/', views.channel_payment_messages_view, name='channel_payment_messages'),
     path('export-json/', views.export_json, name='export_json'),
+    path('dashboard', views.dashboard_view, name='dashboard'),
 ]
