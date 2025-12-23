@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .exports import export_to_excel, export_to_json
 
 urlpatterns = [
     # Saytga birinchi kirilganda Telegram telefon-login sahifasi ochiladi
@@ -20,5 +21,12 @@ urlpatterns = [
     path('stats/<int:channel_id>/truck/', views.channel_truck_messages_view, name='channel_truck_messages'),
     path('stats/<int:channel_id>/payment/', views.channel_payment_messages_view, name='channel_payment_messages'),
     path('export-json/', views.export_json, name='export_json'),
-    path('dashboard', views.dashboard_view, name='dashboard'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+
+    # ⬇️ BOT EXPORT URL QO'SHILDI ⬇️
+    path('bot-export/', views.bot_export_view, name='bot_export'),
+
+    path('excel-export/', views.excel_export_page, name='excel_export_page'),
+    path('export-excel/', export_to_excel, name='export_excel'),
+    path('export-json/', export_to_json, name='export_json'),
 ]

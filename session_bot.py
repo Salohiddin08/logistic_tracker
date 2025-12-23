@@ -1,3 +1,60 @@
+#!/usr/bin/env python
+"""
+Telegram bot with Excel export
+"""
+import os
+import sys
+import django
+
+# Django sozlamalari
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+
+from telegram import Update
+from telegram.ext import Application, CommandHandler
+from telegram_app.bot_service import excel_export_command, export_callback, setup_bot_handlers
+
+# Bot token (.env dan)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv('BOT_TOKEN')  # .env ga qo'shing
+
+
+async def start(update: Update, context):
+    """Start buyrug'i"""
+    await update.message.reply_text(
+        "👋 Assalomu alaykum!\n\n"
+        "📊 Excel export uchun /export buyrug'ini yuboring."
+    )
+
+
+def main():
+    """Bot'ni ishga tushirish"""
+    if not BOT_TOKEN:
+        print("❌ BOT_TOKEN topilmadi! .env faylni tekshiring.")
+        return
+
+    # Application yaratish
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    # Handlerlar
+    app.add_handler(CommandHandler("start", start))
+
+    # Excel export handlerlarini qo'shish
+    setup_bot_handlers(app)
+
+    print("✅ Bot ishga tushdi...")
+    print("📊 Excel export: /export")
+
+    # Polling
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == '__main__':
+    main()
 import os
 
 from telethon import TelegramClient

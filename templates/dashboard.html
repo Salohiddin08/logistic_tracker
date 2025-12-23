@@ -107,7 +107,9 @@
       </div>
       <div class="card-body">
         <p class="mb-3">Ma'lumotlarni Excel formatida Telegram botga yuborish</p>
-{#        <form method="post" action="{% url 'bot_export' %}" class="form-inline">#}
+
+        <!-- FORM TO'G'RILANDI - Comment olib tashlandi -->
+        <form method="post" action="{% url 'bot_export' %}" class="form-inline">
           {% csrf_token %}
           <div class="form-group mr-3">
             <label for="days" class="mr-2">Kunlar:</label>
@@ -123,6 +125,7 @@
             <i class="fas fa-paper-plane mr-1"></i>Yuborish
           </button>
         </form>
+
       </div>
     </div>
   </div>

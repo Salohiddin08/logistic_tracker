@@ -779,3 +779,14 @@ def channel_search(request, channel_id):
         'shipments': shipments,
         'query': query,
     })
+
+# views.py faylining oxiriga qo'shing:
+
+from django.shortcuts import render
+from .exports import export_to_excel, export_to_json
+
+def excel_export_page(request):
+    """
+    Excel export sahifasi
+    """
+    return render(request, 'telegram_app/excel_export.html')
