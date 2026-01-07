@@ -76,6 +76,9 @@
     <div class="card card-outline card-primary">
       <div class="card-header">
         <h3 class="card-title">A → B yo'nalishlari</h3>
+        <div class="card-tools">
+          <span class="badge badge-warning">4️⃣ Dublikat aniqlash</span>
+        </div>
       </div>
       <div class="card-body table-responsive p-0">
         <table class="table table-hover">
@@ -84,6 +87,7 @@
               <th>Qayerdan</th>
               <th>Qayerga</th>
               <th>Soni</th>
+              <th>Amallar</th>
             </tr>
           </thead>
           <tbody>
@@ -92,13 +96,20 @@
               <td>{{ r.origin|default:'-' }}</td>
               <td>{{ r.destination|default:'-' }}</td>
               <td>
-                <a href="{% url 'channel_route_messages' channel_id %}?origin={{ r.origin }}&destination={{ r.destination }}&date_from={{ date_from }}&date_to={{ date_to }}&search={{ request.GET.search }}">
-                  {{ r.total }}
+                <span class="badge badge-primary badge-lg">{{ r.total }} ta yuk</span>
+              </td>
+              <td>
+                <!-- 4️⃣ Dublikatlarni ko'rish tugmasi -->
+                <a href="{% url 'route_duplicates' channel_id %}?origin={{ r.origin }}&destination={{ r.destination }}" class="btn btn-sm btn-warning" title="Dublikatlarni ko'rish">
+                  <i class="fas fa-clone"></i> Dublikatlar
+                </a>
+                <a href="{% url 'channel_route_messages' channel_id %}?origin={{ r.origin }}&destination={{ r.destination }}&date_from={{ date_from }}&date_to={{ date_to }}&search={{ request.GET.search }}" class="btn btn-sm btn-info">
+                  <i class="fas fa-list"></i> Xabarlar
                 </a>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="3" class="text-muted">
+            <tr><td colspan="4" class="text-muted">
               {% if request.GET.search %}
                 "{{ request.GET.search }}" bo'yicha yo'nalishlar topilmadi.
               {% else %}
@@ -310,4 +321,4 @@
   <a class="btn btn-default" href="{% url 'saved_messages' %}"><i class="far fa-comment-dots mr-1"></i>Xabarlar</a>
 </div>
 
-{% endblock page_content %}
+{% endblock page_content %} 

@@ -1,5 +1,6 @@
 import asyncio
-
+import re
+import threading
 from django.conf import settings
 from django.contrib.auth import logout
 from django.db.models import Count, Q
@@ -22,158 +23,53 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
 
-from django.shortcuts import render
-from django.utils import timezone
-from django.db.models import Count
-from .models import Shipment
 
-def dashboard_view(request):
+def _run_async_in_thread(coro):
     """
-    Logistika dashboard sahifasi.
-    - Bugungi yuklar, top origin/destination, cargo va payment statistikasi
-    - Excel export uchun success/error xabarlari
+    Helper function: async coroutine ni alohida threadda ishga tushirish
     """
-    today = timezone.localdate()
-
-    # Bugungi shipmentlar
-    shipments = Shipment.objects.filter(message__date__date=today)
-    total_today = shipments.count()
-
-    # Top boshlang'ich nuqtalar (origin)
-    top_origins = (
-        shipments.values('origin')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-
-    # Top manzillar (destination)
-    top_destinations = (
-        shipments.values('destination')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-
-    # Top yuk turlari (cargo_type)
-    top_cargo = (
-        shipments.values('cargo_type')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-
-    # Top to'lov usullari (payment_type)
-    top_payments = (
-        shipments.values('payment_type')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-
-    # GET params orqali Excel export xabarlari
-    sent = request.GET.get('sent')
-    error = request.GET.get('err')
-
-    context = {
-        'today': today,
-        'total_today': total_today,
-        'top_origins': top_origins,
-        'top_destinations': top_destinations,
-        'top_cargo': top_cargo,
-        'top_payments': top_payments,
-        'sent': sent,
-        'error': error,
-    }
-
-    return render(request, 'dashboard.html', context)
+    result = {'data': None, 'error': None}
+    
+    def run_in_thread():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result['data'] = loop.run_until_complete(coro)
+        except Exception as e:
+            result['error'] = e
+        finally:
+            loop.close()
+    
+    thread = threading.Thread(target=run_in_thread)
+    thread.start()
+    thread.join()
+    
+    if result['error']:
+        raise result['error']
+    return result['data']
 
 
-def home_view(request):
-    """Home page: show dashboard if session exists, else redirect to Telegram login."""
-    if TelegramSession.objects.last():
-        return redirect('dashboard')
-    return redirect('telegram_phone_login')
+# ==================== HELPER FUNCTIONS ====================
 
-
-def dashboard_view(request):
-    """Simple dashboard for today."""
-    today = timezone.localdate()
-
-    shipments = Shipment.objects.select_related('message__channel').filter(message__date__date=today)
-
-    total_today = shipments.count()
-
-    top_origins = (
-        shipments.values('origin')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-    top_destinations = (
-        shipments.values('destination')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-    top_payments = (
-        shipments.values('payment_type')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-    top_cargo = (
-        shipments.values('cargo_type')
-        .annotate(total=Count('id'))
-        .order_by('-total')[:10]
-    )
-
-    sent = request.GET.get('sent')
-    error = request.GET.get('err')
-
-    context = {
-        'today': today,
-        'total_today': total_today,
-        'top_origins': top_origins,
-        'top_destinations': top_destinations,
-        'top_payments': top_payments,
-        'top_cargo': top_cargo,
-        'sent': sent,
-        'error': error,
-    }
-    return render(request, 'dashboard.html', context)
-
-
-@require_POST
-def bot_export_view(request):
-    """Send Excel export to admin chat via Telegram bot."""
-    try:
-        days = int(request.POST.get('days') or 1)
-    except Exception:
-        days = 1
-
-    try:
-        async_to_sync(send_export_now)(days=days)
-        return redirect(f"/dashboard/?sent=1")
-    except Exception as exc:
-        return redirect(f"/dashboard/?err={str(exc)}")
-
-
-def add_session(request):
-    # Oddiy forma orqali API ID / HASH / StringSession qabul qilamiz
-    if request.method == 'POST':
-        api_id = request.POST.get('api_id')
-        api_hash = request.POST.get('api_hash')
-        string_session = request.POST.get('string_session')
-
-        TelegramSession.objects.create(
-            api_id=api_id,
-            api_hash=api_hash,
-            string_session=string_session
-        )
-        return redirect('channels')
-
-    default_api_id = getattr(settings, 'TG_API_ID', '')
-    default_api_hash = getattr(settings, 'TG_API_HASH', '')
-
-    context = {
-        'default_api_id': default_api_id,
-        'default_api_hash': default_api_hash,
-    }
-    return render(request, 'add_session.html', context)
+def highlight_text(text, keywords):
+    """
+    Text ichidagi keywordslarni sariq rangda highlight qilish
+    """
+    if not text or not keywords:
+        return text
+    
+    # Har bir keyword uchun case-insensitive replace
+    highlighted = text
+    for keyword in keywords:
+        if keyword.strip():
+            # Regex bilan case-insensitive replace
+            pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+            highlighted = pattern.sub(
+                lambda m: f'<mark style="background-color: yellow;">{m.group()}</mark>',
+                highlighted
+            )
+    
+    return highlighted
 
 
 def _get_tg_credentials():
@@ -183,7 +79,6 @@ def _get_tg_credentials():
     if not api_id or not api_hash:
         raise ValueError("TG_API_ID / TG_API_HASH .env faylda to'ldirilmagan")
 
-    # Telethon api_id int bo'lishini kutadi
     try:
         api_id = int(api_id)
     except Exception as exc:
@@ -192,8 +87,9 @@ def _get_tg_credentials():
     return api_id, api_hash
 
 
+# ==================== AUTHENTICATION VIEWS ====================
+
 async def _start_phone_login(phone: str):
-    """Telefon raqamni qabul qilib, kod yuboradi va vaqtinchalik sessiyani qaytaradi."""
     api_id, api_hash = _get_tg_credentials()
     client = TelegramClient(StringSession(), api_id, api_hash)
     await client.connect()
@@ -203,7 +99,6 @@ async def _start_phone_login(phone: str):
 
 
 async def _complete_phone_login(temp_session: str, phone: str, code: str, password: str | None, phone_code_hash: str | None):
-    """Kod va (bo'lsa) 2-bosqich parol bilan login qilish."""
     api_id, api_hash = _get_tg_credentials()
     client = TelegramClient(StringSession(temp_session), api_id, api_hash)
     await client.connect()
@@ -219,14 +114,15 @@ async def _complete_phone_login(temp_session: str, phone: str, code: str, passwo
 
 
 def telegram_phone_login(request):
-    """1-bosqich: telefon raqamni kiritish."""
     error = None
 
     if request.method == 'POST':
         phone = request.POST.get('phone')
         if phone:
             try:
-                temp_session, phone_code_hash = asyncio.run(_start_phone_login(phone))
+                # Thread ichida async funksiyani ishga tushirish
+                temp_session, phone_code_hash = _run_async_in_thread(_start_phone_login(phone))
+                    
                 request.session['tg_phone'] = phone
                 request.session['tg_temp_session'] = temp_session
                 request.session['tg_phone_code_hash'] = phone_code_hash
@@ -238,7 +134,6 @@ def telegram_phone_login(request):
 
 
 def telegram_phone_code(request):
-    """2-bosqich: SMS kodi va (bo'lsa) 2-bosqich parol."""
     phone = request.session.get('tg_phone')
     temp_session = request.session.get('tg_temp_session')
     phone_code_hash = request.session.get('tg_phone_code_hash')
@@ -251,7 +146,8 @@ def telegram_phone_code(request):
         password = request.POST.get('password') or None
         if code:
             try:
-                string_session = asyncio.run(
+                # Thread ichida async funksiyani ishga tushirish
+                string_session = _run_async_in_thread(
                     _complete_phone_login(temp_session, phone, code, password, phone_code_hash)
                 )
 
@@ -276,31 +172,158 @@ def telegram_phone_code(request):
     return render(request, 'telegram_login_code.html', context)
 
 
+def add_session(request):
+    if request.method == 'POST':
+        api_id = request.POST.get('api_id')
+        api_hash = request.POST.get('api_hash')
+        string_session = request.POST.get('string_session')
+
+        TelegramSession.objects.create(
+            api_id=api_id,
+            api_hash=api_hash,
+            string_session=string_session
+        )
+        return redirect('channels')
+
+    default_api_id = getattr(settings, 'TG_API_ID', '')
+    default_api_hash = getattr(settings, 'TG_API_HASH', '')
+
+    context = {
+        'default_api_id': default_api_id,
+        'default_api_hash': default_api_hash,
+    }
+    return render(request, 'add_session.html', context)
+
+
+# ==================== DASHBOARD ====================
+
+def home_view(request):
+    if TelegramSession.objects.last():
+        return redirect('dashboard')
+    return redirect('telegram_phone_login')
+
+
+def dashboard_view(request):
+    today = timezone.localdate()
+
+    shipments = Shipment.objects.select_related('message__channel').filter(message__date__date=today)
+
+    total_today = shipments.count()
+
+    top_origins = (
+        shipments
+        .values('origin')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+    top_destinations = (
+        shipments
+        .values('destination')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+    top_payments = (
+        shipments
+        .values('payment_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+    top_cargo = (
+        shipments
+        .values('cargo_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+
+    sent = request.GET.get('sent')
+    error = request.GET.get('err')
+
+    context = {
+        'today': today,
+        'total_today': total_today,
+        'top_origins': top_origins,
+        'top_destinations': top_destinations,
+        'top_payments': top_payments,
+        'top_cargo': top_cargo,
+        'sent': sent,
+        'error': error,
+    }
+    return render(request, 'dashboard.html', context)
+
+
+@require_POST
+def bot_export_view(request):
+    try:
+        days = int(request.POST.get('days') or 1)
+    except Exception:
+        days = 1
+
+    try:
+        async_to_sync(send_export_now)(days=days)
+        return redirect(f"/dashboard/?sent=1")
+    except Exception as exc:
+        return redirect(f"/dashboard/?err={str(exc)}")
+
+
+# ==================== 2️⃣ CHANNELS MANAGEMENT (SUBSCRIPTION) ====================
 def channels_view(request):
+    """
+    Barcha kanallarni ko'rsatish + is_tracked bilan boshqarish
+    """
     session = TelegramSession.objects.last()
     if not session:
         return redirect('telegram_phone_login')
 
     async def run():
         client = await get_client(session.api_id, session.api_hash, session.string_session)
-        return await get_channels(client)
+        tg_channels = await get_channels(client)
+        return tg_channels  # Faqat ma'lumotni qaytarish
 
     try:
-        channels = asyncio.run(run())
+        # Thread ichida async funksiyani ishga tushirish
+        channels = _run_async_in_thread(run())
+        
+        # ✅ Django ORM operatsiyalarini sync kontekstda bajarish
+        for ch in channels:
+            Channel.objects.get_or_create(
+                channel_id=ch['id'],
+                defaults={'title': ch['title']}
+            )
+        
     except Exception as exc:
         return render(
             request,
             'error.html',
             {
                 'title': 'Telegram ulanish xatosi',
-                'message': "Kanallarni olishda xatolik. Session eskirgan bo'lishi yoki TG_API_ID/TG_API_HASH noto'g'ri bo'lishi mumkin.",
+                'message': "Kanallarni olishda xatolik.",
                 'detail': str(exc),
             },
             status=500,
         )
 
+    # DB'dan is_tracked statusini olish
+    db_channels = {ch.channel_id: ch for ch in Channel.objects.all()}
+    
+    for ch in channels:
+        ch['is_tracked'] = db_channels.get(ch['id'], Channel()).is_tracked
+
     return render(request, 'channels.html', {'channels': channels})
 
+
+@require_POST
+def toggle_channel_tracking(request, channel_id):
+    """
+    Kanalni kuzatishni yoqish/o'chirish
+    """
+    channel = get_object_or_404(Channel, channel_id=channel_id)
+    channel.is_tracked = not channel.is_tracked
+    channel.save()
+    
+    return redirect('channels')
+
+
+# ==================== FETCH MESSAGES ====================
 
 def fetch_messages_view(request, channel_id):
     session = TelegramSession.objects.last()
@@ -311,7 +334,8 @@ def fetch_messages_view(request, channel_id):
         client = await get_client(session.api_id, session.api_hash, session.string_session)
         return await get_messages(client, channel_id, limit=100)
 
-    messages = asyncio.run(run())
+    # Thread ichida async funksiyani ishga tushirish
+    messages = _run_async_in_thread(run())
 
     channel_obj, _ = Channel.objects.get_or_create(channel_id=channel_id)
 
@@ -343,8 +367,12 @@ def fetch_messages_view(request, channel_id):
     return redirect('channel_stats', channel_id=channel_id)
 
 
+# ==================== 1️⃣ MESSAGES WITH TAG SEARCH & HIGHLIGHT ====================
+
 def saved_messages_view(request):
-    """Saqlangan xabarlarni sana va qidiruv bo'yicha filtrlash bilan ko'rsatish."""
+    """
+    1️⃣ TAG filter va highlight bilan messages
+    """
     messages = Message.objects.select_related('channel').order_by('-date')
 
     # Sana filtri
@@ -359,33 +387,116 @@ def saved_messages_view(request):
     if parsed_to:
         messages = messages.filter(date__date__lte=parsed_to)
 
-    # SEARCH filtri qo'shish
+    # 1️⃣ TAG SEARCH (so'zlar bo'yicha OR logic)
     search_query = request.GET.get('search', '').strip()
+    keywords = []
+    
     if search_query:
-        messages = messages.filter(
-            Q(channel__title__icontains=search_query) |
-            Q(channel__channel_id__icontains=search_query) |
-            Q(sender_name__icontains=search_query) |
-            Q(text__icontains=search_query)
-        )
+        # Space bilan ajratilgan so'zlar
+        keywords = [kw.strip() for kw in search_query.split() if kw.strip()]
+        
+        # OR logic: kamida bitta so'z bo'lsa ham chiqsin
+        q_objects = Q()
+        for keyword in keywords:
+            q_objects |= Q(text__icontains=keyword)
+        
+        messages = messages.filter(q_objects)
 
+    # Highlight uchun keywordslarni context'ga yuborish
     paginator = Paginator(messages, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    # Har bir message uchun highlighted text yaratish
+    for msg in page_obj.object_list:
+        msg.highlighted_text = highlight_text(msg.text, keywords)
 
     context = {
         'messages': page_obj.object_list,
         'page_obj': page_obj,
         'date_from': date_from,
         'date_to': date_to,
+        'search_query': search_query,
+        'keywords': keywords,
     }
     return render(request, 'messages.html', context)
 
+
+# ==================== 3️⃣ MESSAGE DETAIL VIEW ====================
+
+def message_detail_view(request, message_id):
+    """
+    3️⃣ Message ustiga bosganda to'liq ko'rinish
+    """
+    message = get_object_or_404(Message.objects.select_related('channel'), pk=message_id)
+    
+    try:
+        shipment = message.shipment
+    except Shipment.DoesNotExist:
+        shipment = None
+    
+    context = {
+        'message': message,
+        'shipment': shipment,
+    }
+    return render(request, 'message_detail.html', context)
+
+
+# ==================== 4️⃣ DUPLICATE DETECTION ====================
+
+def route_duplicates_view(request, channel_id):
+    """
+    4️⃣ Bir xil yo'nalish bo'yicha dublikatlarni ko'rsatish
+    """
+    origin = request.GET.get('origin')
+    destination = request.GET.get('destination')
+    
+    shipments = Shipment.objects.filter(
+        message__channel__channel_id=channel_id,
+        origin=origin,
+        destination=destination
+    ).select_related('message').order_by('-message__date')
+    
+    # Dublikat detection (text similarity)
+    total_count = shipments.count()
+    unique_texts = set()
+    duplicate_count = 0
+    
+    shipments_with_status = []
+    for shipment in shipments:
+        text = (shipment.message.text or "").strip().lower()
+        
+        if text in unique_texts:
+            is_duplicate = True
+            duplicate_count += 1
+        else:
+            is_duplicate = False
+            unique_texts.add(text)
+        
+        shipments_with_status.append({
+            'shipment': shipment,
+            'is_duplicate': is_duplicate
+        })
+    
+    unique_count = total_count - duplicate_count
+    
+    context = {
+        'channel_id': channel_id,
+        'origin': origin,
+        'destination': destination,
+        'total_count': total_count,
+        'duplicate_count': duplicate_count,
+        'unique_count': unique_count,
+        'shipments': shipments_with_status,
+    }
+    return render(request, 'route_duplicates.html', context)
+
+
+# ==================== EXISTING VIEWS (Updated) ====================
+
 def _get_filtered_shipments(request, channel_id):
-    """Yordamchi funksiya: kanal, sana va SEARCH bo'yicha Shipment querysetini qaytaradi."""
     shipments = Shipment.objects.filter(message__channel__channel_id=channel_id)
 
-    # Sana filtri
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
 
@@ -397,7 +508,6 @@ def _get_filtered_shipments(request, channel_id):
     if parsed_to:
         shipments = shipments.filter(message__date__date__lte=parsed_to)
 
-    # SEARCH filtri - BU JUDA MUHIM!
     search_query = request.GET.get('search', '').strip()
     if search_query:
         shipments = shipments.filter(
@@ -413,10 +523,12 @@ def _get_filtered_shipments(request, channel_id):
 
 
 def channel_stats_view(request, channel_id):
-    """Tanlangan kanal bo'yicha yuk statistikasi (sana va search filtri bilan)."""
+    """
+    4️⃣ Yo'nalishlar bilan dublikat hisobi
+    """
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
-    # A → B yo'nalishlar
+    # A → B yo'nalishlar + dublikat hisobi
     route_qs = (
         shipments
         .values('origin', 'destination')
@@ -428,7 +540,6 @@ def channel_stats_view(request, channel_id):
     route_page_obj = route_paginator.get_page(route_page_number)
     route_stats = route_page_obj.object_list
 
-    # Yuk turlari
     cargo_qs = (
         shipments
         .values('cargo_type')
@@ -440,7 +551,6 @@ def channel_stats_view(request, channel_id):
     cargo_page_obj = cargo_paginator.get_page(cargo_page_number)
     cargo_stats = cargo_page_obj.object_list
 
-    # Transport turlari
     truck_qs = (
         shipments
         .values('truck_type')
@@ -452,7 +562,6 @@ def channel_stats_view(request, channel_id):
     truck_page_obj = truck_paginator.get_page(truck_page_number)
     truck_stats = truck_page_obj.object_list
 
-    # To'lov turlari
     payment_qs = (
         shipments
         .values('payment_type')
@@ -481,8 +590,9 @@ def channel_stats_view(request, channel_id):
     return render(request, 'stats.html', context)
 
 
+# ==================== REMAINING VIEWS ====================
+
 def channel_stats_excel(request, channel_id):
-    """Tanlangan kanal bo'yicha yuk ma'lumotlarini Excel formatida yuklab berish."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
     filename_parts = [f"channel_{channel_id}"]
@@ -533,10 +643,8 @@ def channel_stats_excel(request, channel_id):
 
 
 def channel_phones_view(request, channel_id):
-    """Kanal bo'yicha unikal telefon raqamlar ro'yxati."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
-    # SEARCH filtri qo'shish
     search_query = request.GET.get('search', '').strip()
 
     raw_stats = (
@@ -548,7 +656,6 @@ def channel_phones_view(request, channel_id):
         .order_by('-total')
     )
 
-    # Agar search bo'lsa, phone bo'yicha filtrlash
     if search_query:
         raw_stats = raw_stats.filter(phone__icontains=search_query)
 
@@ -571,11 +678,11 @@ def channel_phones_view(request, channel_id):
         'date_to': date_to,
     }
     return render(request, 'phones.html', context)
+
+
 def channel_phones_excel(request, channel_id):
-    """Unikal telefon raqamlarini Excel formatida yuklash."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
-    # SEARCH filtri qo'shish
     search_query = request.GET.get('search', '').strip()
 
     phone_stats = (
@@ -587,7 +694,6 @@ def channel_phones_excel(request, channel_id):
         .order_by('-total')
     )
 
-    # Agar search bo'lsa, phone bo'yicha filtrlash
     if search_query:
         phone_stats = phone_stats.filter(phone__icontains=search_query)
 
@@ -627,7 +733,6 @@ def channel_phones_excel(request, channel_id):
 
 
 def channel_phone_messages_view(request, channel_id):
-    """Muayyan telefon raqami bo'yicha xabarlar ro'yxati."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
     phone = request.GET.get('phone') or None
@@ -652,7 +757,6 @@ def channel_phone_messages_view(request, channel_id):
 
 
 def channel_route_messages_view(request, channel_id):
-    """Muayyan yo'nalish (origin/destination) bo'yicha xabarlar ro'yxati."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
     origin = request.GET.get('origin') or None
@@ -678,7 +782,6 @@ def channel_route_messages_view(request, channel_id):
 
 
 def channel_cargo_messages_view(request, channel_id):
-    """Muayyan yuk turi bo'yicha xabarlar ro'yxati."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
     cargo_type = request.GET.get('cargo_type') or None
@@ -700,7 +803,6 @@ def channel_cargo_messages_view(request, channel_id):
 
 
 def channel_truck_messages_view(request, channel_id):
-    """Muayyan transport (truck_type) bo'yicha xabarlar ro'yxati."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
     truck_type = request.GET.get('truck_type') or None
@@ -724,7 +826,6 @@ def channel_truck_messages_view(request, channel_id):
 
 
 def channel_payment_messages_view(request, channel_id):
-    """Muayyan to'lov turi (payment_type) bo'yicha xabarlar ro'yxati."""
     shipments, date_from, date_to = _get_filtered_shipments(request, channel_id)
 
     payment_type = request.GET.get('payment_type') or None
@@ -755,7 +856,7 @@ def export_json(request):
 def logout_view(request):
     """Oddiy GET orqali ham chiqishni qo'llab-quvvatlaydigan logout."""
     logout(request)
-    return redirect('login')
+    return redirect('telegram_phone_login')
 
 
 def channel_search(request, channel_id):
@@ -780,13 +881,7 @@ def channel_search(request, channel_id):
         'query': query,
     })
 
-# views.py faylining oxiriga qo'shing:
-
-from django.shortcuts import render
-from .exports import export_to_excel, export_to_json
 
 def excel_export_page(request):
-    """
-    Excel export sahifasi
-    """
+    """Excel export sahifasi"""
     return render(request, 'telegram_app/excel_export.html')

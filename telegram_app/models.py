@@ -13,6 +13,7 @@ class TelegramSession(models.Model):
 class Channel(models.Model):
     channel_id = models.BigIntegerField(unique=True)
     title = models.CharField(max_length=255, null=True, blank=True)
+    is_tracked = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return f"{self.title} ({self.channel_id})"
