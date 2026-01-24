@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_date
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from asgiref.sync import async_to_sync
+from django.contrib import messages  
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -326,6 +327,9 @@ def toggle_channel_tracking(request, channel_id):
 # ==================== FETCH MESSAGES ====================
 
 def fetch_messages_view(request, channel_id):
+    """
+    Kanaldan xabarlarni olish va parsing qilish
+    """
     session = TelegramSession.objects.last()
     if not session:
         return redirect('add_session')
@@ -334,13 +338,21 @@ def fetch_messages_view(request, channel_id):
         client = await get_client(session.api_id, session.api_hash, session.string_session)
         return await get_messages(client, channel_id, limit=100)
 
-    # Thread ichida async funksiyani ishga tushirish
     messages = _run_async_in_thread(run())
-
     channel_obj, _ = Channel.objects.get_or_create(channel_id=channel_id)
 
-    for m in messages:
-        msg_obj, _ = Message.objects.get_or_create(
+    total_messages = len(messages)
+    total_shipments = 0
+    
+    print(f"\n{'='*50}")
+    print(f"📦 Jami {total_messages} ta xabar parsing qilinmoqda...")
+    print(f"{'='*50}\n")
+
+    for idx, m in enumerate(messages, 1):
+        # Progress ko'rsatish
+        print(f"⏳ [{idx}/{total_messages}] Parsing qilinmoqda... ", end='', flush=True)
+        
+        msg_obj, created = Message.objects.get_or_create(
             channel=channel_obj,
             message_id=m.id,
             defaults={
@@ -351,18 +363,31 @@ def fetch_messages_view(request, channel_id):
             },
         )
 
-        parsed = parse_shipment_text(m.message or "")
-        Shipment.objects.update_or_create(
-            message=msg_obj,
-            defaults={
-                'origin': parsed.get('origin'),
-                'destination': parsed.get('destination'),
-                'cargo_type': parsed.get('cargo_type'),
-                'truck_type': parsed.get('truck_type'),
-                'payment_type': parsed.get('payment_type'),
-                'phone': parsed.get('phone'),
-            },
-        )
+        # Parsing
+        shipments_data = parse_shipment_text(m.message or "")
+        
+        if not created:
+            msg_obj.shipments.all().delete()
+        
+        for shipment_data in shipments_data:
+            Shipment.objects.create(
+                message=msg_obj,
+                origin=shipment_data.get('origin'),
+                destination=shipment_data.get('destination'),
+                cargo_type=shipment_data.get('cargo_type'),
+                truck_type=shipment_data.get('truck_type'),
+                payment_type=shipment_data.get('payment_type'),
+                phone=shipment_data.get('phone'),
+                weight=shipment_data.get('weight'),
+                additional_info=shipment_data.get('additional_info'),
+            )
+            total_shipments += 1
+        
+        print(f"✅ {len(shipments_data)} ta yuk")
+
+    print(f"\n{'='*50}")
+    print(f"🎉 Tayyor! {total_shipments} ta yuk saqlandi")
+    print(f"{'='*50}\n")
 
     return redirect('channel_stats', channel_id=channel_id)
 
@@ -854,9 +879,10 @@ def export_json(request):
 
 
 def logout_view(request):
-    """Oddiy GET orqali ham chiqishni qo'llab-quvvatlaydigan logout."""
+    """Logout - tizimdan chiqish"""
     logout(request)
-    return redirect('telegram_phone_login')
+    messages.success(request, "Tizimdan chiqdingiz!")
+    return redirect('login')  # ✅ 'login' ga yo'naltirish
 
 
 def channel_search(request, channel_id):
@@ -885,3 +911,280 @@ def channel_search(request, channel_id):
 def excel_export_page(request):
     """Excel export sahifasi"""
     return render(request, 'telegram_app/excel_export.html')
+
+# telegram_app/views.py (qo'shimcha)
+import threading
+from django.core.cache import cache
+
+# Global storage for progress
+parsing_progress = {}
+
+def parse_messages_in_background(channel_id, messages):
+    """
+    Background threadda parsing qilish
+    """
+    channel_obj, _ = Channel.objects.get_or_create(channel_id=channel_id)
+    total_messages = len(messages)
+    total_shipments = 0
+    
+    cache.set(f'parsing_{channel_id}', {
+        'status': 'running',
+        'current': 0,
+        'total': total_messages,
+        'shipments': 0
+    }, timeout=3600)
+    
+    for idx, m in enumerate(messages, 1):
+        try:
+            msg_obj, created = Message.objects.get_or_create(
+                channel=channel_obj,
+                message_id=m.id,
+                defaults={
+                    'sender_id': getattr(m.from_id, 'user_id', None),
+                    'sender_name': getattr(m.sender, 'username', None) if m.sender else None,
+                    'text': m.message,
+                    'date': m.date,
+                },
+            )
+
+            shipments_data = parse_shipment_text(m.message or "")
+            
+            if not created:
+                msg_obj.shipments.all().delete()
+            
+            for shipment_data in shipments_data:
+                Shipment.objects.create(
+                    message=msg_obj,
+                    origin=shipment_data.get('origin'),
+                    destination=shipment_data.get('destination'),
+                    cargo_type=shipment_data.get('cargo_type'),
+                    truck_type=shipment_data.get('truck_type'),
+                    payment_type=shipment_data.get('payment_type'),
+                    phone=shipment_data.get('phone'),
+                    weight=shipment_data.get('weight'),
+                    additional_info=shipment_data.get('additional_info'),
+                )
+                total_shipments += 1
+            
+            # Progress update
+            cache.set(f'parsing_{channel_id}', {
+                'status': 'running',
+                'current': idx,
+                'total': total_messages,
+                'shipments': total_shipments
+            }, timeout=3600)
+            
+        except Exception as e:
+            print(f"❌ Xabar {m.id} parsing xatosi: {e}")
+            continue
+    
+    # Tugadi
+    cache.set(f'parsing_{channel_id}', {
+        'status': 'completed',
+        'current': total_messages,
+        'total': total_messages,
+        'shipments': total_shipments
+    }, timeout=3600)
+
+
+def fetch_messages_view(request, channel_id):
+    """
+    YANGI: Background parsing bilan
+    """
+    session = TelegramSession.objects.last()
+    if not session:
+        return redirect('add_session')
+
+    async def run():
+        client = await get_client(session.api_id, session.api_hash, session.string_session)
+        return await get_messages(client, channel_id, limit=100)
+
+    messages = _run_async_in_thread(run())
+    
+    # Background threadda parse qilish
+    thread = threading.Thread(
+        target=parse_messages_in_background,
+        args=(channel_id, messages),
+        daemon=True
+    )
+    thread.start()
+    
+    # Darhol progress page ga yo'naltirish
+    return redirect('parsing_progress', channel_id=channel_id)
+
+
+def parsing_progress_view(request, channel_id):
+    """
+    Parsing progressini ko'rsatish
+    """
+    progress = cache.get(f'parsing_{channel_id}')
+    
+    if not progress:
+        return redirect('channel_stats', channel_id=channel_id)
+    
+    context = {
+        'channel_id': channel_id,
+        'progress': progress
+    }
+    return render(request, 'parsing_progress.html', context)
+
+# telegram_app/views.py ga qo'shish
+
+import threading
+from django.core.cache import cache
+
+# ==================== BACKGROUND PARSING ====================
+
+def parse_messages_in_background(channel_id, messages):
+    """
+    Background threadda parsing qilish
+    """
+    from .models import Channel, Message, Shipment
+    from .utils import parse_shipment_text
+    
+    channel_obj, _ = Channel.objects.get_or_create(channel_id=channel_id)
+    total_messages = len(messages)
+    total_shipments = 0
+    
+    # Initial progress
+    cache.set(f'parsing_{channel_id}', {
+        'status': 'running',
+        'current': 0,
+        'total': total_messages,
+        'shipments': 0
+    }, timeout=3600)
+    
+    print(f"\n{'='*60}")
+    print(f"📦 Background parsing boshlandi: {total_messages} ta xabar")
+    print(f"{'='*60}\n")
+    
+    for idx, m in enumerate(messages, 1):
+        try:
+            print(f"⏳ [{idx}/{total_messages}] Message ID: {m.id} parsing qilinmoqda...", end=' ', flush=True)
+            
+            msg_obj, created = Message.objects.get_or_create(
+                channel=channel_obj,
+                message_id=m.id,
+                defaults={
+                    'sender_id': getattr(m.from_id, 'user_id', None),
+                    'sender_name': getattr(m.sender, 'username', None) if m.sender else None,
+                    'text': m.message,
+                    'date': m.date,
+                },
+            )
+
+            # Parsing
+            shipments_data = parse_shipment_text(m.message or "")
+            
+            # Eski shipmentlarni o'chirish
+            if not created:
+                msg_obj.shipments.all().delete()
+            
+            # Yangi shipmentlarni saqlash
+            for shipment_data in shipments_data:
+                Shipment.objects.create(
+                    message=msg_obj,
+                    origin=shipment_data.get('origin'),
+                    destination=shipment_data.get('destination'),
+                    cargo_type=shipment_data.get('cargo_type'),
+                    truck_type=shipment_data.get('truck_type'),
+                    payment_type=shipment_data.get('payment_type'),
+                    phone=shipment_data.get('phone'),
+                    weight=shipment_data.get('weight'),
+                    additional_info=shipment_data.get('additional_info'),
+                )
+                total_shipments += 1
+            
+            print(f"✅ {len(shipments_data)} ta yuk")
+            
+            # Progress update
+            cache.set(f'parsing_{channel_id}', {
+                'status': 'running',
+                'current': idx,
+                'total': total_messages,
+                'shipments': total_shipments
+            }, timeout=3600)
+            
+        except Exception as e:
+            print(f"❌ Xato: {e}")
+            continue
+    
+    print(f"\n{'='*60}")
+    print(f"🎉 Parsing tugadi! Jami: {total_shipments} ta yuk saqlandi")
+    print(f"{'='*60}\n")
+    
+    # Tugadi
+    cache.set(f'parsing_{channel_id}', {
+        'status': 'completed',
+        'current': total_messages,
+        'total': total_messages,
+        'shipments': total_shipments
+    }, timeout=3600)
+
+
+# ==================== YANGILANGAN FETCH VIEW ====================
+
+def fetch_messages_view(request, channel_id):
+    """
+    YANGI: Background parsing bilan xabarlarni olish
+    """
+    session = TelegramSession.objects.last()
+    if not session:
+        return redirect('add_session')
+
+    async def run():
+        client = await get_client(session.api_id, session.api_hash, session.string_session)
+        return await get_messages(client, channel_id, limit=100)
+
+    # Xabarlarni olish
+    messages = _run_async_in_thread(run())
+    
+    # Background threadda parsing qilish
+    thread = threading.Thread(
+        target=parse_messages_in_background,
+        args=(channel_id, messages),
+        daemon=True
+    )
+    thread.start()
+    
+    # Darhol progress page ga yo'naltirish
+    return redirect('parsing_progress', channel_id=channel_id)
+
+
+def parsing_progress_view(request, channel_id):
+    """
+    Parsing progressini ko'rsatish
+    """
+    progress = cache.get(f'parsing_{channel_id}')
+    
+    # Agar progress yo'q bo'lsa, stats ga yo'naltirish
+    if not progress:
+        return redirect('channel_stats', channel_id=channel_id)
+    
+    # Agar tugagan bo'lsa va user refresh qilsa, stats ga yo'naltirish
+    if progress.get('status') == 'completed' and request.GET.get('auto_redirect') == '1':
+        return redirect('channel_stats', channel_id=channel_id)
+    
+    context = {
+        'channel_id': channel_id,
+        'progress': progress
+    }
+    return render(request, 'parsing_progress.html', context)
+def parse_messages_in_background(channel_id, messages):
+    # ... yuqoridagi kod
+    
+    try:
+        for idx, m in enumerate(messages, 1):
+            # ... parsing kodi
+            pass
+    except Exception as e:
+        # Xatolik yuz berganda
+        cache.set(f'parsing_{channel_id}', {
+            'status': 'error',
+            'current': idx,
+            'total': total_messages,
+            'shipments': total_shipments,
+            'error': str(e)
+        }, timeout=3600)
+        print(f"❌ Fatal error: {e}")
+        return

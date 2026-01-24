@@ -136,3 +136,26 @@ TELEGRAM_ADMIN_CHAT_ID = env_config('TELEGRAM_ADMIN_CHAT_ID', cast=int, default=
 LOGIN_URL = 'login'
 # Kirgandan keyin asosiy sahifa (session qo'shish / dashboard)
 LOGIN_REDIRECT_URL = '/'
+# config/settings.py
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Base directory
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env faylni yuklash
+load_dotenv(BASE_DIR / '.env')
+
+# GROQ API Key
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+
+# config/settings.py
+
+# Cache sozlamalari
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
